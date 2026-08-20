@@ -1,8 +1,8 @@
 apiVersion: v2
 name: openeverest
 description: A cloud-native database platform
-version: "1.15.0"
-appVersion: "1.15.0"
+version: "2.0.0-dev.2"
+appVersion: "2.0.0-dev.2"
 type: application
 kubeVersion: '>= 1.27.0-0'
 home: https://openeverest.io
@@ -45,11 +45,6 @@ dependencies:
     # This is not really a dependency, but we define it as one so that we're
     # able to conditionally disable rendering these manifests along with the core chart manifests.
     # The default behaviour of Helm is to always include the sub-chart manfiests unless explicitly disabled.
-  - name: everest-db-namespace
-    alias: dbNamespace
-    version: "1.15.0"
-    repository: "file://charts/everest-db-namespace"
-    condition: "dbNamespace.enabled"
   - name: kube-state-metrics
     repository: https://prometheus-community.github.io/helm-charts
     version: 5.27.0
@@ -70,9 +65,8 @@ dependencies:
   - name: everest-crds
     repository: "file://charts/everest-crds"
     condition: "everest-crds.enabled"
-    version: "1.15.0"
-  - name: operator-lifecycle-manager
-    alias: olm
-    repository: "https://percona.github.io/operator-lifecycle-manager"
-    condition: "olm.install"
+    version: "2.0.0-dev.2"
+  - name: plugin-hub
+    repository: "oci://ghcr.io/openeverest/charts"
+    condition: "plugins.hub.enabled"
     version: "0.1.*"

@@ -1,0 +1,94 @@
+{{- if .Values.controller.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: everest-controller
+  namespace: {{ include "everest.namespace" . }}
+  labels:
+    app: everest-controller
+spec:
+  replicas: 1
+  revisionHistoryLimit: 1
+  selector:
+    matchLabels:
+      app: everest-controller
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: everest-controller
+    spec:
+      containers:
+      - name: manager
+        {{- $repo := default .Values.server.image.repository .Values.controller.image.repository }}
+        {{- $tag := default .Values.server.image.tag .Values.controller.image.tag | default .Chart.AppVersion }}
+        {{- $pullPolicy := default .Values.server.image.pullPolicy .Values.controller.image.pullPolicy }}
+        image: {{ $repo }}:{{ $tag }}
+        imagePullPolicy: {{ $pullPolicy }}
+        command:
+        - {{ .Values.controller.command }}
+        args:
+        {{- if .Values.controller.leaderElection.enabled }}
+        - --leader-elect
+        {{- end }}
+        - --metrics-bind-address={{ .Values.controller.metricsBindAddress }}
+        - --health-probe-bind-address={{ .Values.controller.healthProbeBindAddress }}
+        - --webhook-cert-path=/tmp/k8s-webhook-server/serving-certs
+        - --monitoring-namespace={{ .Values.monitoring.namespaceOverride }}
+        ports:
+        - containerPort: 8081
+          name: health
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          failureThreshold: 3
+          timeoutSeconds: 1
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          failureThreshold: 3
+          timeoutSeconds: 1
+        resources: {{ toYaml .Values.controller.resources | nindent 10 }}
+        {{- if .Values.controller.env }}
+        env:
+        {{- toYaml .Values.controller.env | nindent 8 }}
+        {{- end }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        volumeMounts:
+        - mountPath: /tmp/k8s-webhook-server/serving-certs
+          name: everest-controller-webhook-server-cert
+          readOnly: true
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      securityContext:
+        runAsNonRoot: true
+        # 65532 is the standard non-root UID used by distroless/nonroot images.
+        # The manager image is built FROM scratch with no USER directive, so it
+        # defaults to root (UID 0). Setting runAsUser here explicitly overrides
+        # that default to satisfy the runAsNonRoot constraint.
+        runAsUser: 65532
+      serviceAccountName: everest-controller-manager
+      terminationGracePeriodSeconds: 10
+      volumes:
+      - name: everest-controller-webhook-server-cert
+        secret:
+          secretName: everest-controller-webhook-server-cert
+{{- end }}

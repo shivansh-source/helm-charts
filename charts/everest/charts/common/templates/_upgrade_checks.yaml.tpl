@@ -101,6 +101,11 @@ spec:
       containers:
         - image: {{ .image }}:{{ .version }}
           name: {{ $hookName }}
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
           command:
             - /bin/sh
             - -ec
